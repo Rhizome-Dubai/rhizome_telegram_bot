@@ -37,6 +37,7 @@ class ChatGPT:
                     r = await openai.ChatCompletion.acreate(
                         model=self.model,
                         messages=messages,
+                        request_timeout=90000,
                         **OPENAI_COMPLETION_OPTIONS
                     )
                     answer = r.choices[0].message["content"]
@@ -45,6 +46,7 @@ class ChatGPT:
                     r = await openai.Completion.acreate(
                         engine=self.model,
                         prompt=prompt,
+                        request_timeout=90000,
                         **OPENAI_COMPLETION_OPTIONS
                     )
                     answer = r.choices[0].text
@@ -77,6 +79,7 @@ class ChatGPT:
                     r_gen = await openai.ChatCompletion.acreate(
                         model=self.model,
                         messages=messages,
+                        request_timeout=90000,
                         stream=True,
                         **OPENAI_COMPLETION_OPTIONS
                     )
@@ -94,6 +97,7 @@ class ChatGPT:
                     r_gen = await openai.Completion.acreate(
                         engine=self.model,
                         prompt=prompt,
+                        request_timeout=90000,
                         stream=True,
                         **OPENAI_COMPLETION_OPTIONS
                     )
