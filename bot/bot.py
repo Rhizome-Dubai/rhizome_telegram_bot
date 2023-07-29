@@ -146,7 +146,7 @@ async def start_handle(update: Update, context: CallbackContext):
             reply_text += f"<blockquote>User_ID: {user_id}</blockquote>\n"
         if chat_id is not None:        
             reply_text += f"<blockquote>Chat_ID: {chat_id}</blockquote>\n"
-    else
+    else:
         reply_text += HELP_MESSAGE
 
     await update.message.reply_text(reply_text, parse_mode=ParseMode.HTML)
