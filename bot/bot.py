@@ -47,10 +47,8 @@ HELP_MESSAGE = """Commands:
 ⚪ /new – Start new dialog
 ⚪ /mode – Select chat mode
 ⚪ /settings – Show settings
-⚪ /balance – Show balance
 ⚪ /help – Show help
 
-🎨 Generate images from text prompts in <b>👩‍🎨 Artist</b> /mode
 👥 Add bot to <b>group chat</b>: /help_group_chat
 🎤 You can send <b>Voice Messages</b> instead of text
 """
@@ -94,7 +92,7 @@ async def register_user_if_not_exists(update: Update, context: CallbackContext, 
 
     # back compatibility for n_used_tokens field
     n_used_tokens = db.get_user_attribute(user.id, "n_used_tokens")
-    if isinstance(n_used_tokens, int) or isinstance(n_used_tokens, float):  # old format
+    if isinstance(n_used_tokens, int):  # old format
         new_n_used_tokens = {
             "gpt-3.5-turbo": {
                 "n_input_tokens": 0,
@@ -134,12 +132,22 @@ async def is_bot_mentioned(update: Update, context: CallbackContext):
 async def start_handle(update: Update, context: CallbackContext):
     await register_user_if_not_exists(update, context, update.message.from_user)
     user_id = update.message.from_user.id
-
+    chat_id = update.message.chat.id
+    
     db.set_user_attribute(user_id, "last_interaction", datetime.now())
     db.start_new_dialog(user_id)
-
+    
     reply_text = "Hi! I'm <b>ChatGPT</b> bot implemented with OpenAI API 🤖\n\n"
-    reply_text += HELP_MESSAGE
+
+    # Check if the user or chat is allowed based on the user_filter
+    if not user_filter(update):
+        reply_text += f"You are not invited! To continue ask owner to add \n"
+        if user_id is not None:
+            reply_text += f"<blockquote>User_ID: {user_id}</blockquote>\n"
+        if chat_id is not None:        
+            reply_text += f"<blockquote>Chat_ID: {chat_id}</blockquote>\n"
+    else
+        reply_text += HELP_MESSAGE
 
     await update.message.reply_text(reply_text, parse_mode=ParseMode.HTML)
     await show_chat_modes_handle(update, context)
@@ -235,20 +243,33 @@ async def message_handle(update: Update, context: CallbackContext, message=None,
                 "html": ParseMode.HTML,
                 "markdown": ParseMode.MARKDOWN
             }[config.chat_modes[chat_mode]["parse_mode"]]
-
             chatgpt_instance = openai_utils.ChatGPT(model=current_model)
-            if config.enable_message_streaming:
-                gen = chatgpt_instance.send_message_stream(_message, dialog_messages=dialog_messages, chat_mode=chat_mode)
-            else:
-                answer, (n_input_tokens, n_output_tokens), n_first_dialog_messages_removed = await chatgpt_instance.send_message(
-                    _message,
+
+            streaming_map = {
+                "assistant": chatgpt_instance.send_message_stream,
+            }
+
+            oneshot_map = {
+                "assistant": chatgpt_instance.send_message,
+                "langchain_assistant": openai_utils.query_langchain,
+            }
+
+            if config.enable_message_streaming and config.chat_modes[chat_mode].get("stream", true):
+                gen = streaming_map.get(chat_mode, chatgpt_instance.send_message_stream)(
+                    _message, 
                     dialog_messages=dialog_messages,
                     chat_mode=chat_mode
                 )
-
+            else:
                 async def fake_gen():
                     yield "finished", answer, (n_input_tokens, n_output_tokens), n_first_dialog_messages_removed
 
+                answer, (n_input_tokens, n_output_tokens), n_first_dialog_messages_removed = await oneshot_map\
+                    .get(chat_mode, chatgpt_instance.send_message)(
+                        _message,
+                        dialog_messages=dialog_messages,
+                        chat_mode=chat_mode
+                    )
                 gen = fake_gen()
 
             prev_answer = ""
@@ -272,7 +293,6 @@ async def message_handle(update: Update, context: CallbackContext, message=None,
                 await asyncio.sleep(0.01)  # wait a bit to avoid flooding
 
                 prev_answer = answer
-
             # update user data
             new_dialog_message = {"user": _message, "bot": answer, "date": datetime.now()}
             db.set_dialog_messages(
@@ -369,6 +389,24 @@ async def voice_message_handle(update: Update, context: CallbackContext):
 
     await message_handle(update, context, message=transcribed_text)
 
+async def get_langchain_update(update: Update, context: CallbackContext, message=None):
+    await register_user_if_not_exists(update, context, update.message.from_user)
+    if await is_previous_message_not_answered_yet(update, context): return
+
+    user_id = update.message.from_user.id
+    db.set_user_attribute(user_id, "last_interaction", datetime.now())
+   
+    try:
+        answer = await openai_utils.query_langchain(message)
+        await update.message.reply_text(answer)
+        return
+    except Exception as e:
+        error_text = f"Something went wrong during completion. Reason: {e}"
+        logger.error(error_text)
+        await update.message.reply_text(error_text)
+        return
+
+# token usage
 
 async def generate_image_handle(update: Update, context: CallbackContext, message=None):
     await register_user_if_not_exists(update, context, update.message.from_user)
@@ -665,8 +703,6 @@ def run_bot() -> None:
         .token(config.telegram_token)
         .concurrent_updates(True)
         .rate_limiter(AIORateLimiter(max_retries=5))
-        .http_version("1.1")
-        .get_updates_http_version("1.1")
         .post_init(post_init)
         .build()
     )
@@ -675,12 +711,11 @@ def run_bot() -> None:
     user_filter = filters.ALL
     if len(config.allowed_telegram_usernames) > 0:
         usernames = [x for x in config.allowed_telegram_usernames if isinstance(x, str)]
-        any_ids = [x for x in config.allowed_telegram_usernames if isinstance(x, int)]
-        user_ids = [x for x in any_ids if x > 0]
-        group_ids = [x for x in any_ids if x < 0]
-        user_filter = filters.User(username=usernames) | filters.User(user_id=user_ids) | filters.Chat(chat_id=group_ids)
+        user_ids = [x for x in config.allowed_telegram_usernames if (isinstance(x, int) and x > 0)]
+        chat_ids = [x for x in config.allowed_telegram_usernames if (isinstance(x, int) and x < 0)]
+        user_filter = filters.User(username=usernames) | filters.User(user_id=user_ids) | filters.Chat(chat_id=chat_ids)
 
-    application.add_handler(CommandHandler("start", start_handle, filters=user_filter))
+    application.add_handler(CommandHandler("start", start_handle, filters=filters.ALL))
     application.add_handler(CommandHandler("help", help_handle, filters=user_filter))
     application.add_handler(CommandHandler("help_group_chat", help_group_chat_handle, filters=user_filter))
 

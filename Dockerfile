@@ -1,23 +1,50 @@
-FROM python:3.8-slim
+# Use an official Python runtime as a parent image
+FROM python:3.11-alpine as builder
 
-RUN \
-    set -eux; \
-    apt-get update; \
-    DEBIAN_FRONTEND="noninteractive" apt-get install -y --no-install-recommends \
-    python3-pip \
-    build-essential \
-    python3-venv \
-    ffmpeg \
-    git \
-    ; \
-    rm -rf /var/lib/apt/lists/*
+# Set environment variables
+ENV PYTHONFAULTHANDLER=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONHASHSEED=random \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=off \
+    PIP_DISABLE_PIP_VERSION_CHECK=on \
+    PIP_DEFAULT_TIMEOUT=100
 
-RUN pip3 install -U pip && pip3 install -U wheel && pip3 install -U setuptools==59.5.0
-COPY ./requirements.txt /tmp/requirements.txt
-RUN pip3 install -r /tmp/requirements.txt && rm -r /tmp/requirements.txt
+# Install necessary packages and create code directory
+RUN apk add --no-cache build-base && \
+    mkdir -p /code
 
-COPY . /code
+# Set the working directory to /code
 WORKDIR /code
 
-CMD ["bash"]
+# Copy the current directory contents into the container at /code
+COPY . /code/
 
+# Install any needed packages specified in requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Final stage to keep only necessary files and dependencies
+FROM python:3.11-alpine
+
+# Install necessary libraries for ffmpeg
+RUN apk add --no-cache libgcc libstdc++ musl ffmpeg
+
+# Copy necessary files and dependencies from builder stage
+COPY --from=builder /usr/local/lib/python3.11/site-packages/ /usr/local/lib/python3.11/site-packages/
+COPY --from=builder /usr/lib/ /usr/lib/
+COPY --from=builder /code/ /code/
+
+# Set the working directory to /code
+WORKDIR /code
+
+# Set environment variables
+ENV PYTHONFAULTHANDLER=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONHASHSEED=random \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=off \
+    PIP_DISABLE_PIP_VERSION_CHECK=on \
+    PIP_DEFAULT_TIMEOUT=100
+
+# Run the command when the container launches
+CMD ["bash"]

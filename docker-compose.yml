@@ -5,14 +5,13 @@ services:
     container_name: mongo
     image: mongo:latest
     restart: always
-    ports:
-      - 127.0.0.1:${MONGODB_PORT:-27017}:${MONGODB_PORT:-27017}
     volumes:
-      - ${MONGODB_PATH:-./mongodb}:/data/db
-    # TODO: add auth
+      - "${MONGODB_PATH:-./mongodb}:/data/db"
+    networks:
+      - gptbot_internal_network
 
-  chatgpt_telegram_bot:
-    container_name: chatgpt_telegram_bot
+  rhizome_telegram_bot:
+    container_name: rhizome_telegram_bot
     command: python3 bot/bot.py
     restart: always
     build:
@@ -20,13 +19,17 @@ services:
       dockerfile: Dockerfile
     depends_on:
       - mongo
+    networks:
+      - gptbot_internal_network
+    extra_hosts:
+      - host.docker.internal:host-gateway  
+    environment:   
+      - HOST_API_URL=http://host.docker.internal:8008
 
   mongo_express:
     container_name: mongo-express
     image: mongo-express:latest
     restart: always
-    ports:
-      - 127.0.0.1:${MONGO_EXPRESS_PORT:-8081}:${MONGO_EXPRESS_PORT:-8081}
     environment:
       - ME_CONFIG_MONGODB_SERVER=mongo
       - ME_CONFIG_MONGODB_PORT=${MONGODB_PORT:-27017}
@@ -36,3 +39,8 @@ services:
       - ME_CONFIG_BASICAUTH_PASSWORD=${MONGO_EXPRESS_PASSWORD:-password}
     depends_on:
       - mongo
+    networks:
+      - gptbot_internal_network
+
+networks:
+  gptbot_internal_network:

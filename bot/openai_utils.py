@@ -2,6 +2,11 @@ import config
 
 import tiktoken
 import openai
+import aiohttp
+import json
+import os
+
+host_api_url = os.getenv('HOST_API_URL')
 openai.api_key = config.openai_api_key
 
 
@@ -15,8 +20,8 @@ OPENAI_COMPLETION_OPTIONS = {
 
 
 class ChatGPT:
-    def __init__(self, model="gpt-3.5-turbo"):
-        assert model in {"text-davinci-003", "gpt-3.5-turbo-16k", "gpt-3.5-turbo", "gpt-4"}, f"Unknown model: {model}"
+    def __init__(self, model=config.chatgpt_model):
+        assert model in {"text-davinci-003", "gpt-3.5-turbo", "gpt-4", "gpt-4-32k"}, f"Unknown model: {model}"
         self.model = model
 
     async def send_message(self, message, dialog_messages=[], chat_mode="assistant"):
@@ -27,7 +32,7 @@ class ChatGPT:
         answer = None
         while answer is None:
             try:
-                if self.model in {"gpt-3.5-turbo-16k", "gpt-3.5-turbo", "gpt-4"}:
+                if self.model in {"gpt-3.5-turbo", "gpt-4"}:
                     messages = self._generate_prompt_messages(message, dialog_messages, chat_mode)
                     r = await openai.ChatCompletion.acreate(
                         model=self.model,
@@ -67,7 +72,7 @@ class ChatGPT:
         answer = None
         while answer is None:
             try:
-                if self.model in {"gpt-3.5-turbo-16k", "gpt-3.5-turbo", "gpt-4"}:
+                if self.model in {"gpt-3.5-turbo", "gpt-4"}:
                     messages = self._generate_prompt_messages(message, dialog_messages, chat_mode)
                     r_gen = await openai.ChatCompletion.acreate(
                         model=self.model,
@@ -146,12 +151,9 @@ class ChatGPT:
     def _count_tokens_from_messages(self, messages, answer, model="gpt-3.5-turbo"):
         encoding = tiktoken.encoding_for_model(model)
 
-        if model == "gpt-3.5-turbo-16k":
+        if model == "gpt-3.5-turbo":
             tokens_per_message = 4  # every message follows <im_start>{role/name}\n{content}<im_end>\n
             tokens_per_name = -1  # if there's a name, the role is omitted
-        elif model == "gpt-3.5-turbo":
-            tokens_per_message = 4
-            tokens_per_name = -1    
         elif model == "gpt-4":
             tokens_per_message = 3
             tokens_per_name = 1
@@ -186,6 +188,35 @@ class ChatGPT:
 async def transcribe_audio(audio_file):
     r = await openai.Audio.atranscribe("whisper-1", audio_file)
     return r["text"]
+
+
+async def query_langchain(message, dialog_messages=[]):
+    url = host_api_url + "/message"
+    timeout = aiohttp.ClientTimeout(total=300)
+    headers = {'Content-Type': 'application/json'}
+    data = {
+        'message': message,
+        'dialog_messages': dialog_messages
+    }
+
+    try:
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.post(url, data=json.dumps(data), headers=headers) as resp:
+                if resp.status == 200:
+                    response = await resp.json()
+                    error = response.get('error', False)
+                    if error:
+                        return f"Error from server: {response.get('answer')}", (0, 0), 0
+                    else:
+                        answer = response.get('answer')
+                        n_input_tokens = response.get('n_input_tokens', 0)
+                        n_output_tokens = response.get('n_output_tokens', 0)
+                        n_first_dialog_messages_removed = response.get('n_first_dialog_messages_removed', 0)
+                        return answer, (n_input_tokens, n_output_tokens), n_first_dialog_messages_removed
+                else:
+                    raise Exception(f"Unexpected response status: {resp.status}")
+    except Exception as e:
+        raise e
 
 
 async def generate_images(prompt, n_images=4):
