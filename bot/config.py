@@ -30,6 +30,8 @@ with open(config_dir / "chat_modes.yml", 'r', encoding='utf-8') as f:
 # models
 with open(config_dir / "models.yml", 'r', encoding='utf-8') as f:
     models = yaml.safe_load(f)
-
+available_models=models.get("available_text_models", ["gpt-3.5-turbo", "gpt-3.5-turbo-16k", "gpt-4"])
+chat_models=models.get("available_chat_models", ["gpt-3.5-turbo", "gpt-3.5-turbo-16k", "gpt-4"])
+comp_models=models.get("available_completion_models", ["text-davinci-003"])
 # files
 help_group_chat_video_path = Path(__file__).parent.parent.resolve() / "static" / "help_group_chat.mp4"

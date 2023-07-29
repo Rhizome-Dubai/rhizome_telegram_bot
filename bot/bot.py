@@ -154,9 +154,8 @@ async def start_handle(update: Update, context: CallbackContext):
     
     reply_text = "Hi! I'm <b>ChatGPT</b> bot implemented with OpenAI API 🤖\n\n"
 
-    reply_text += f"Your IDs are\n"
-    reply_text += f"<blockquote>User_ID: {user.id}</blockquote>\n"
-    reply_text += f"<blockquote>Chat_ID: {chat.id}</blockquote>\n"
+    reply_text += f"User_ID: {user.id}\n"
+    reply_text += f"Chat_ID: {chat.id}\n"
     reply_text += HELP_MESSAGE
 
     await update.message.reply_text(reply_text, parse_mode=ParseMode.HTML)
@@ -268,7 +267,7 @@ async def message_handle(update: Update, context: CallbackContext, message=None,
                 "langchain_assistant": openai_utils.query_langchain,
             }
 
-            if config.enable_message_streaming and config.chat_modes[chat_mode].get("stream", true):
+            if config.enable_message_streaming and config.chat_modes[chat_mode].get("stream", True):
                 gen = streaming_map.get(chat_mode, chatgpt_instance.send_message_stream)(
                     _message, 
                     dialog_messages=dialog_messages,
@@ -579,7 +578,7 @@ async def set_chat_mode_handle(update: Update, context: CallbackContext):
 
 
 def get_settings_menu(user_id: int):
-    current_model = db.get_user_attribute(user.id, "current_model")
+    current_model = db.get_user_attribute(user_id, "current_model")
     text = config.models["info"][current_model]["description"]
 
     text += "\n\n"
@@ -742,6 +741,10 @@ def run_bot() -> None:
         user_ids = [x for x in config.allowed_telegram_usernames if (isinstance(x, int) and x > 0)]
         chat_ids = [x for x in config.allowed_telegram_usernames if (isinstance(x, int) and x < 0)]
         user_filter = filters.User(username=usernames) | filters.User(user_id=user_ids) | filters.Chat(chat_id=chat_ids)
+        # Print the contents of the arrays for debugging
+        print("Usernames:", usernames)
+        print("User IDs:", user_ids)
+        print("Chat IDs:", chat_ids)
 
     application.add_handler(CommandHandler("start", start_handle, filters=filters.ALL))
     application.add_handler(CommandHandler("help", help_handle, filters=user_filter))
