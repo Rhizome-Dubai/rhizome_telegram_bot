@@ -177,12 +177,12 @@ async def help_group_chat_handle(update: Update, context: CallbackContext):
     is_valid, user, chat = await get_user_and_chat(update)
     if not is_valid: return
     await register_user_if_not_exists(chat, context, user)
-      db.set_user_attribute(user.id, "last_interaction", datetime.now())
+    db.set_user_attribute(user.id, "last_interaction", datetime.now())
 
-     text = HELP_GROUP_CHAT_MESSAGE.format(bot_username="@" + context.bot.username)
+    text = HELP_GROUP_CHAT_MESSAGE.format(bot_username="@" + context.bot.username)
 
-     await update.message.reply_text(text, parse_mode=ParseMode.HTML)
-     await update.message.reply_video(config.help_group_chat_video_path)
+    await update.message.reply_text(text, parse_mode=ParseMode.HTML)
+    await update.message.reply_video(config.help_group_chat_video_path)
 
 
 async def retry_handle(update: Update, context: CallbackContext):
