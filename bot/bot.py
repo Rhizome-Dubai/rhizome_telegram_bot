@@ -144,7 +144,8 @@ async def is_bot_mentioned(update: Update, context: CallbackContext):
 
 
 async def start_handle(update: Update, context: CallbackContext):
-    is_valid, user, chat = await get_user_and_chat(update) or return
+    is_valid, user, chat = await get_user_and_chat(update)
+    if not is_valid: return
     await register_user_if_not_exists(chat, context, user)
     
     db.set_user_attribute(user.id, "last_interaction", datetime.now())
@@ -165,14 +166,16 @@ async def start_handle(update: Update, context: CallbackContext):
 
 
 async def help_handle(update: Update, context: CallbackContext):
-    is_valid, user, chat = await get_user_and_chat(update) or return
+    is_valid, user, chat = await get_user_and_chat(update)
+    if not is_valid: return
     await register_user_if_not_exists(chat, context, user)
     db.set_user_attribute(user.id, "last_interaction", datetime.now())
     await update.message.reply_text(HELP_MESSAGE, parse_mode=ParseMode.HTML)
 
 
 async def help_group_chat_handle(update: Update, context: CallbackContext):
-     is_valid, user, chat = await get_user_and_chat(update) or return
+    is_valid, user, chat = await get_user_and_chat(update)
+    if not is_valid: return
     await register_user_if_not_exists(chat, context, user)
       db.set_user_attribute(user.id, "last_interaction", datetime.now())
 
@@ -183,7 +186,8 @@ async def help_group_chat_handle(update: Update, context: CallbackContext):
 
 
 async def retry_handle(update: Update, context: CallbackContext):
-    is_valid, user, chat = await get_user_and_chat(update) or return
+    is_valid, user, chat = await get_user_and_chat(update)
+    if not is_valid: return
     await register_user_if_not_exists(chat, context, user)
     if await is_previous_message_not_answered_yet(update, context): return
 
@@ -216,7 +220,8 @@ async def message_handle(update: Update, context: CallbackContext, message=None,
     if update.message.chat.type != "private":
         _message = _message.replace("@" + context.bot.username, "").strip()
 
-    is_valid, user, chat = await get_user_and_chat(update) or return
+    is_valid, user, chat = await get_user_and_chat(update)
+    if not is_valid: return
     await register_user_if_not_exists(chat, context, user)
     if await is_previous_message_not_answered_yet(update, context): return
 
@@ -349,7 +354,8 @@ async def message_handle(update: Update, context: CallbackContext, message=None,
 
 
 async def is_previous_message_not_answered_yet(update: Update, context: CallbackContext):
-    is_valid, user, chat = await get_user_and_chat(update) or return
+    is_valid, user, chat = await get_user_and_chat(update)
+    if not is_valid: return
     await register_user_if_not_exists(chat, context, user)
 
     if user_semaphores[user.id].locked():
@@ -366,7 +372,8 @@ async def voice_message_handle(update: Update, context: CallbackContext):
     if not await is_bot_mentioned(update, context):
         return
 
-    is_valid, user, chat = await get_user_and_chat(update) or return
+    is_valid, user, chat = await get_user_and_chat(update)
+    if not is_valid: return
     await register_user_if_not_exists(chat, context, user)
     if await is_previous_message_not_answered_yet(update, context): return
 
@@ -401,7 +408,8 @@ async def voice_message_handle(update: Update, context: CallbackContext):
     await message_handle(update, context, message=transcribed_text)
 
 async def get_langchain_update(update: Update, context: CallbackContext, message=None):
-    is_valid, user, chat = await get_user_and_chat(update) or return
+    is_valid, user, chat = await get_user_and_chat(update)
+    if not is_valid: return
     await register_user_if_not_exists(chat, context, user)
     if await is_previous_message_not_answered_yet(update, context): return
 
@@ -420,7 +428,8 @@ async def get_langchain_update(update: Update, context: CallbackContext, message
 # token usage
 
 async def generate_image_handle(update: Update, context: CallbackContext, message=None):
-    is_valid, user, chat = await get_user_and_chat(update) or return
+    is_valid, user, chat = await get_user_and_chat(update)
+    if not is_valid: return
     await register_user_if_not_exists(chat, context, user)
     if await is_previous_message_not_answered_yet(update, context): return
 
@@ -449,7 +458,8 @@ async def generate_image_handle(update: Update, context: CallbackContext, messag
 
 
 async def new_dialog_handle(update: Update, context: CallbackContext):
-    is_valid, user, chat = await get_user_and_chat(update) or return
+    is_valid, user, chat = await get_user_and_chat(update)
+    if not is_valid: return
     await register_user_if_not_exists(chat, context, user)
     if await is_previous_message_not_answered_yet(update, context): return
 
@@ -463,7 +473,8 @@ async def new_dialog_handle(update: Update, context: CallbackContext):
 
 
 async def cancel_handle(update: Update, context: CallbackContext):
-    is_valid, user, chat = await get_user_and_chat(update) or return
+    is_valid, user, chat = await get_user_and_chat(update)
+    if not is_valid: return
     await register_user_if_not_exists(chat, context, user)
 
     db.set_user_attribute(user.id, "last_interaction", datetime.now())
@@ -513,7 +524,8 @@ def get_chat_mode_menu(page_index: int):
 
 
 async def show_chat_modes_handle(update: Update, context: CallbackContext):
-    is_valid, user, chat = await get_user_and_chat(update) or return
+    is_valid, user, chat = await get_user_and_chat(update)
+    if not is_valid: return
     await register_user_if_not_exists(chat, context, user)
     if await is_previous_message_not_answered_yet(update, context): return
 
@@ -525,7 +537,7 @@ async def show_chat_modes_handle(update: Update, context: CallbackContext):
 
 async def show_chat_modes_callback_handle(update: Update, context: CallbackContext):
      is_valid, user, chat = await get_user_and_chat(update.callback_query)
-     return if chat is None
+     if chat is None: return
      user = update.callback_query.from_user
      await register_user_if_not_exists(chat, context, user)
      if await is_previous_message_not_answered_yet(update.callback_query, context): return
@@ -549,7 +561,7 @@ async def show_chat_modes_callback_handle(update: Update, context: CallbackConte
 
 async def set_chat_mode_handle(update: Update, context: CallbackContext):
     is_valid, user, chat = await get_user_and_chat(update.callback_query)
-    return if chat is None
+    if chat is None: return
     user = update.callback_query.from_user
     await register_user_if_not_exists(chat, context, user)
     
@@ -595,7 +607,8 @@ def get_settings_menu(user.id: int):
 
 
 async def settings_handle(update: Update, context: CallbackContext):
-    is_valid, user, chat = await get_user_and_chat(update) or return
+    is_valid, user, chat = await get_user_and_chat(update)
+    if not is_valid: return
     await register_user_if_not_exists(chat, context, user)
     if await is_previous_message_not_answered_yet(update, context): return
 
@@ -607,7 +620,7 @@ async def settings_handle(update: Update, context: CallbackContext):
 
 async def set_settings_handle(update: Update, context: CallbackContext):
     is_valid, user, chat = await get_user_and_chat(update.callback_query)
-    return if chat is None
+    if chat is None: return
     user = update.callback_query.from_user
     await register_user_if_not_exists(chat, context, user)
 
@@ -627,7 +640,8 @@ async def set_settings_handle(update: Update, context: CallbackContext):
 
 
 async def show_balance_handle(update: Update, context: CallbackContext):
-    is_valid, user, chat = await get_user_and_chat(update) or return
+    is_valid, user, chat = await get_user_and_chat(update)
+    if not is_valid: return
     await register_user_if_not_exists(chat, context, user)
 
     db.set_user_attribute(user.id, "last_interaction", datetime.now())
