@@ -14,6 +14,7 @@ import telegram
 from telegram import (
     Update,
     User,
+    Chat,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     BotCommand
@@ -153,13 +154,10 @@ async def start_handle(update: Update, context: CallbackContext):
     
     reply_text = "Hi! I'm <b>ChatGPT</b> bot implemented with OpenAI API 🤖\n\n"
 
-    # Check if the user or chat is allowed based on the user_filter
-    if not user_filter(update):
-        reply_text += f"You are not invited! To continue ask owner to add \n"
-        reply_text += f"<blockquote>User_ID: {user.id}</blockquote>\n"
-        reply_text += f"<blockquote>Chat_ID: {chat.id}</blockquote>\n"
-    else:
-        reply_text += HELP_MESSAGE
+    reply_text += f"Your IDs are\n"
+    reply_text += f"<blockquote>User_ID: {user.id}</blockquote>\n"
+    reply_text += f"<blockquote>Chat_ID: {chat.id}</blockquote>\n"
+    reply_text += HELP_MESSAGE
 
     await update.message.reply_text(reply_text, parse_mode=ParseMode.HTML)
     await show_chat_modes_handle(update, context)
@@ -580,7 +578,7 @@ async def set_chat_mode_handle(update: Update, context: CallbackContext):
     )
 
 
-def get_settings_menu(user.id: int):
+def get_settings_menu(user_id: int):
     current_model = db.get_user_attribute(user.id, "current_model")
     text = config.models["info"][current_model]["description"]
 
@@ -741,9 +739,9 @@ def run_bot() -> None:
     # add handlers
     if len(config.allowed_telegram_usernames) > 0:
         usernames = [x for x in config.allowed_telegram_usernames if isinstance(x, str)]
-        user.ids = [x for x in config.allowed_telegram_usernames if (isinstance(x, int) and x > 0)]
+        user_ids = [x for x in config.allowed_telegram_usernames if (isinstance(x, int) and x > 0)]
         chat_ids = [x for x in config.allowed_telegram_usernames if (isinstance(x, int) and x < 0)]
-        user_filter = filters.User(username=usernames) | filters.User(user.id=user.ids) | filters.Chat(chat_id=chat_ids)
+        user_filter = filters.User(username=usernames) | filters.User(user_id=user_ids) | filters.Chat(chat_id=chat_ids)
 
     application.add_handler(CommandHandler("start", start_handle, filters=filters.ALL))
     application.add_handler(CommandHandler("help", help_handle, filters=user_filter))
